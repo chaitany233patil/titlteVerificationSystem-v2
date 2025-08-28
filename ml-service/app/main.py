@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Literal, Dict, Any
+from typing import List, Literal, Dict, Any, Optional
 
 import numpy as np
 import jellyfish
@@ -18,6 +18,7 @@ except Exception:
 class SimilarityRequest(BaseModel):
     title: str
     existing_titles: List[str]
+    threshold: Optional[float] = None
 
 
 class Match(BaseModel):
@@ -86,10 +87,11 @@ def check_similarity(payload: SimilarityRequest) -> Dict[str, Any]:
 
     matches: List[Match] = []
 
-    # Thresholds can be tuned
-    PHONETIC_THRESH = 0.85
-    LEXICAL_THRESH = 0.75
-    SEMANTIC_THRESH = 0.75
+    # Thresholds (use provided threshold for all, else defaults)
+    base_thresh = payload.threshold if payload.threshold is not None else 0.75
+    PHONETIC_THRESH = max(0.0, min(1.0, base_thresh if payload.threshold is not None else 0.85))
+    LEXICAL_THRESH = max(0.0, min(1.0, base_thresh))
+    SEMANTIC_THRESH = max(0.0, min(1.0, base_thresh))
 
     for i, t in enumerate(existing):
         if phonetic[i] >= PHONETIC_THRESH:
