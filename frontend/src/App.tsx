@@ -21,6 +21,8 @@ function App() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [threshold, setThreshold] = useState<number>(0.75);
   const [version, setVersion] = useState<string>("v1");
+  const [adding, setAdding] = useState(false);
+  const [addResult, setAddResult] = useState<string | null>(null);
 
   const apiBase = useMemo(() => {
     return import.meta.env.VITE_API_URL || "http://localhost:4000";
@@ -31,6 +33,7 @@ function App() {
     setError(null);
     setStatus(null);
     setMatches([]);
+    setAddResult(null);
     const t = title.trim();
     if (!t) {
       setError("Please enter a title");
@@ -55,6 +58,32 @@ function App() {
       setError(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const onRegister = async () => {
+    const t = title.trim();
+    if (!t) return;
+    setAdding(true);
+    setAddResult(null);
+    setError(null);
+    try {
+      const res = await fetch(`${apiBase}/api/titles/add`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: t }),
+      });
+      if (!res.ok) {
+        const tx = await res.text();
+        throw new Error(tx || "Failed to add title");
+      }
+      const _data = await res.json();
+      setAddResult("Title registered successfully");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Request failed";
+      setError(message);
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -169,6 +198,23 @@ function App() {
                       Threshold: {threshold}
                     </p>
                   </div>
+                  {status === "Unique" && (
+                    <div className="mt-4 flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={onRegister}
+                        disabled={adding || !title.trim()}
+                        className="px-4 py-2 rounded-md bg-brand text-white font-medium hover:bg-brand-dark transition-colors disabled:opacity-60"
+                      >
+                        {adding ? "Registering..." : "Register title"}
+                      </button>
+                      {addResult && (
+                        <span className="text-sm text-green-600">
+                          {addResult}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

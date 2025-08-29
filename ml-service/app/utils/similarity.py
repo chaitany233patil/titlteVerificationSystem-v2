@@ -10,6 +10,7 @@ try:
 except Exception:
     _sbert_model = None
 
+print(_sbert_model)
 
 def _levenshtein_distance_score(a: str, b: str) -> float:
     """Calculate normalized Levenshtein distance score between two strings."""
@@ -23,7 +24,6 @@ def _levenshtein_distance_score(a: str, b: str) -> float:
     # Normalize to 0-1 range where 1 means identical
     if max_len == 0:
         return 1.0
-    
     return 1.0 - (dist / max_len)
 
 
@@ -36,8 +36,12 @@ def _phonetic_score(a: str, b: str) -> float:
     if a_codes == b_codes:
         return 1.0
     
+    distance = jellyfish.levenshtein_distance(a_codes, b_codes)
+    max_len = max(len(a_codes), len(b_codes))
+    similarity = 1 - (distance / max_len)
+
     # If metaphone codes don't match, return 0
-    return 0.0
+    return similarity
 
 
 def _lexical_scores(query: str, corpus: List[str], threshold: float) -> List[float]:
