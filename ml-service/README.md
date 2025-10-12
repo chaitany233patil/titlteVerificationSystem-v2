@@ -1,6 +1,46 @@
 # ML Service - Similarity Detection
 
 This service provides similarity detection between titles using multiple algorithms:
+
+## Quick Setup
+
+### 1. Create Virtual Environment
+
+```bash
+python -m venv venv
+```
+
+### 2. Activate Virtual Environment
+
+**Windows:**
+```bash
+venv\Scripts\activate
+```
+
+**Mac/Linux:**
+```bash
+source venv/bin/activate
+```
+
+### 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Start the Service
+
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+The service will run on http://localhost:8000
+
+---
+
+## About
+
+This service provides similarity detection between titles using multiple algorithms:
 - **Levenshtein Distance**: String edit distance for typo detection
 - **Phonetic Similarity**: Double Metaphone codes for sound-alike detection
 - **Lexical Similarity**: TF-IDF + Cosine similarity for word-based matching

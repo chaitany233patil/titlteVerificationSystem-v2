@@ -1,3 +1,41 @@
+# Frontend - Title Verification UI
+
+React + TypeScript + Vite application for title verification.
+
+## Quick Setup
+
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure Environment (Optional)
+
+Create a `.env` file if you need to change the backend URL:
+```
+VITE_API_URL=http://localhost:4000
+```
+
+Default is http://localhost:4000 if not specified.
+
+### 3. Start Development Server
+
+```bash
+npm run dev
+```
+
+The app will run on http://localhost:5173
+
+## Build for Production
+
+```bash
+npm run build
+npm run preview
+```
+
+---
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
