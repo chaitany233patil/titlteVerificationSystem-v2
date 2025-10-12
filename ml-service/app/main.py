@@ -55,7 +55,6 @@ def favicon():
 def check_similarity(payload: SimilarityRequest) -> Dict[str, Any]:
     title = payload.title.strip()
     existing = [t.strip() for t in payload.existing_titles if t and t.strip()]
-
     if not title:
         return {"status": "Invalid", "matches": []}
     if not existing:
@@ -68,6 +67,13 @@ def check_similarity(payload: SimilarityRequest) -> Dict[str, Any]:
     levenshtein_matches = []
     for t in existing:
         score = _levenshtein_distance_score(title, t)
+        if score >= threshold:
+            levenshtein_matches.append({
+                "title": t,
+                "similarity": float(round(score, 4)),
+                "type": "levenshtein"
+            })
+        score = _levenshtein_distance_score(' '.join(title.split()[::-1]), t)
         if score >= threshold:
             levenshtein_matches.append({
                 "title": t,
