@@ -77,7 +77,7 @@ function App() {
         const tx = await res.text();
         throw new Error(tx || "Failed to add title");
       }
-      const _data = await res.json();
+      await res.json();
       setAddResult("Title registered successfully");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Request failed";
