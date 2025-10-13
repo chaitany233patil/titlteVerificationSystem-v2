@@ -1,0 +1,38 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: ./docker/backend.Dockerfile
+    depends_on:
+      - ml_service
+    ports:
+      - "4000:4000"
+    networks:
+      - app_network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ./docker/frontend.Dockerfile
+    ports:
+      - "4173:4173"
+    depends_on:
+      - ml_service
+      - backend
+    networks:
+      - app_network
+
+  ml_service:
+    build:
+      context: .
+      dockerfile: ./docker/ml_service.Dockerfile
+    ports:
+      - "8000:8000"
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
