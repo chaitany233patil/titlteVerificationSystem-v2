@@ -5,7 +5,7 @@ import "./App.css";
 type Match = {
   title: string;
   similarity: number;
-  type: "phonetic" | "lexical" | "semantic";
+  type: "phonetic" | "lexical" | "semantic" | "levenshtein";
 };
 
 function toPercent(value: number): string {
@@ -16,6 +16,8 @@ function toPercent(value: number): string {
 function App() {
   const [title, setTitle] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<"single" | "file">("single");
+  const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -41,11 +43,24 @@ function App() {
     }
     setLoading(true);
     try {
-      const res = await fetch(`${apiBase}/api/titles/verify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: t, threshold, version }),
-      });
+      let res: Response;
+      if (mode === "single") {
+        res = await fetch(`${apiBase}/api/titles/verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: t, threshold, version }),
+        });
+      } else {
+        if (!file) throw new Error("Please upload a file to check against");
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("title", t);
+        fd.append("threshold", String(threshold));
+        res = await fetch(`${apiBase}/api/titles/verify-file`, {
+          method: "POST",
+          body: fd,
+        });
+      }
       if (!res.ok) {
         const tx = await res.text();
         throw new Error(tx);
@@ -59,6 +74,11 @@ function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] ?? null;
+    setFile(f);
   };
 
   const onRegister = async () => {
@@ -128,6 +148,37 @@ function App() {
               onSubmit={onSubmit}
               className="mt-10 grid grid-cols-1 md:grid-cols-12 gap-3"
             >
+              <div className="md:col-span-12 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMode("single")}
+                  className={`px-3 py-1 rounded ${
+                    mode === "single" ? "bg-brand text-white" : "border"
+                  }`}
+                >
+                  Single Title
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("file")}
+                  className={`px-3 py-1 rounded ${
+                    mode === "file" ? "bg-brand text-white" : "border"
+                  }`}
+                >
+                  Upload CSV / Excel
+                </button>
+              </div>
+              {mode === "file" && (
+                <div className="md:col-span-6 px-2 py-3 rounded-md border border-gray-300">
+                  <label className="text-sm text-gray-600">Upload file</label>
+                  <input
+                    type="file"
+                    accept=".csv, .xlsx, .xls"
+                    onChange={onFileChange}
+                    className="mt-2"
+                  />
+                </div>
+              )}
               <input
                 aria-label="Proposed title"
                 placeholder="Enter a title to verify"
