@@ -83,34 +83,45 @@ def check_similarity(payload: SimilarityRequest) -> Dict[str, Any]:
     
     # If we found Levenshtein matches, check if we should return early
     if levenshtein_matches:
+        # If we have a very strong Levenshtein match (e.g. exact or near-exact),
+        # we can safely return without running heavier methods.
+        max_lev = max(m["similarity"] for m in levenshtein_matches)
+        if max_lev >= max(threshold, 0.95):
+            final_matches = sorted(levenshtein_matches, key=lambda m: m["similarity"], reverse=True)
+            return {
+                "status": "Not Unique",
+                "matches": final_matches
+            }
+
         # Check if any of these titles also have matches in other methods
         matched_titles = set(match["title"] for match in levenshtein_matches)
         
-        # Get other similarity scores
-        phonetic, lexical, semantic = check_similarity_scores(title, existing, threshold)
+        # Get other similarity scores only for the titles that already
+        # matched via Levenshtein, to avoid unnecessary work.
+        candidate_titles = [t for t in existing if t in matched_titles]
+        phonetic, lexical, semantic = check_similarity_scores(title, candidate_titles, threshold)
         
         # Check for additional matches in other methods
         other_matches = []
-        for i, t in enumerate(existing):
-            if t in matched_titles:  # Only check titles that already have Levenshtein matches
-                if phonetic[i] >= threshold:
-                    other_matches.append({
-                        "title": t,
-                        "similarity": float(round(phonetic[i], 4)),
-                        "type": "phonetic"
-                    })
-                if lexical[i] >= threshold:
-                    other_matches.append({
-                        "title": t,
-                        "similarity": float(round(lexical[i], 4)),
-                        "type": "lexical"
-                    })
-                if semantic[i] >= threshold:
-                    other_matches.append({
-                        "title": t,
-                        "similarity": float(round(semantic[i], 4)),
-                        "type": "semantic"
-                    })
+        for i, t in enumerate(candidate_titles):
+            if phonetic[i] >= threshold:
+                other_matches.append({
+                    "title": t,
+                    "similarity": float(round(phonetic[i], 4)),
+                    "type": "phonetic"
+                })
+            if lexical[i] >= threshold:
+                other_matches.append({
+                    "title": t,
+                    "similarity": float(round(lexical[i], 4)),
+                    "type": "lexical"
+                })
+            if semantic[i] >= threshold:
+                other_matches.append({
+                    "title": t,
+                    "similarity": float(round(semantic[i], 4)),
+                    "type": "semantic"
+                })
         
         # Combine all matches and deduplicate
         all_matches = levenshtein_matches + other_matches

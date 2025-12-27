@@ -36,12 +36,43 @@ def _phonetic_score(a: str, b: str) -> float:
     if a_codes == b_codes:
         return 1.0
     
+    if not a_codes or not b_codes:
+        return 0.0
+
     distance = jellyfish.levenshtein_distance(a_codes, b_codes)
     max_len = max(len(a_codes), len(b_codes))
     similarity = 1 - (distance / max_len)
 
-    # If metaphone codes don't match, return 0
     return similarity
+
+
+def _phonetic_scores(query: str, corpus: List[str]) -> List[float]:
+    """Vectorized phonetic similarity for a query against a corpus.
+
+    This avoids recomputing the metaphone of the query for every title
+    and is significantly faster for large corpora.
+    """
+    if not corpus:
+        return []
+
+    q_code = jellyfish.metaphone(query)
+    if not q_code:
+        return [0.0 for _ in corpus]
+
+    scores: List[float] = []
+    for t in corpus:
+        t_code = jellyfish.metaphone(t)
+        if q_code == t_code:
+            scores.append(1.0)
+            continue
+        if not t_code:
+            scores.append(0.0)
+            continue
+        dist = jellyfish.levenshtein_distance(q_code, t_code)
+        max_len = max(len(q_code), len(t_code))
+        scores.append(1.0 - (dist / max_len))
+
+    return scores
 
 
 def _lexical_scores(query: str, corpus: List[str], threshold: float) -> List[float]:
@@ -60,7 +91,10 @@ def _semantic_scores(query: str, corpus: List[str], threshold: float) -> List[fl
     if _sbert_model is None or not corpus:
         return [0.0 for _ in corpus]
     
+    # Encode query once
     q_emb = _sbert_model.encode([query], convert_to_tensor=True)
+    # Encode corpus in a single batch (still O(N) but much faster than
+    # calling encode for each item).
     c_emb = _sbert_model.encode(corpus, convert_to_tensor=True)
     sims = st_util.cos_sim(q_emb, c_emb).cpu().numpy().flatten().tolist()
     return sims
@@ -68,10 +102,49 @@ def _semantic_scores(query: str, corpus: List[str], threshold: float) -> List[fl
 
 def check_similarity_scores(title: str, existing: List[str], threshold: float) -> Tuple[List[float], List[float], List[float]]:
     """Calculate all similarity scores for a title against existing titles."""
-    phonetic = [_phonetic_score(title.lower(), t.lower()) for t in existing]
+    if not existing:
+        return [], [], []
+
+    # Phonetic scores (vectorized implementation)
+    phonetic = _phonetic_scores(title.lower(), [t.lower() for t in existing])
+
+    # Lexical scores for all titles
     lexical = _lexical_scores(title, existing, threshold)
-    semantic = _semantic_scores(title, existing, threshold)
-    
+
+    # Limit expensive semantic computation to the most promising candidates.
+    # We keep all methods but only run the heaviest one on a subset.
+    n = len(existing)
+    semantic: List[float] = [0.0] * n
+
+    # Decide how many candidates should go through semantic similarity.
+    max_semantic_candidates = min(500, n)
+
+    # Sort indices by lexical score (desc) and take the top candidates.
+    sorted_indices = sorted(range(n), key=lambda i: lexical[i], reverse=True)
+    candidate_indices = sorted_indices[:max_semantic_candidates]
+
+    # Additionally, ensure we keep any titles whose lexical score is already
+    # above (threshold - 0.1), in case the top-N heuristic would miss them.
+    extra_indices = [
+        i for i in range(n)
+        if lexical[i] >= max(threshold - 0.1, 0.0) and i not in candidate_indices
+    ]
+    candidate_indices.extend(extra_indices)
+
+    # Deduplicate indices while preserving order
+    seen = set()
+    unique_candidate_indices = []
+    for idx in candidate_indices:
+        if idx not in seen:
+            seen.add(idx)
+            unique_candidate_indices.append(idx)
+
+    if unique_candidate_indices:
+        candidate_corpus = [existing[i] for i in unique_candidate_indices]
+        candidate_semantic = _semantic_scores(title, candidate_corpus, threshold)
+        for i, score in zip(unique_candidate_indices, candidate_semantic):
+            semantic[i] = score
+
     return phonetic, lexical, semantic
 
 
